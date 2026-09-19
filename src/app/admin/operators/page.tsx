@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Users, Plus, Search } from 'lucide-react';
 import AdminEmptyState from '@/components/admin/AdminEmptyState';
-import { getOperators, createOperator } from '@/services/supabaseAdminService';
+import { getOperators, createOperator, updateOperator, deleteOperator } from '@/services/supabaseAdminService';
 
 const DEFAULT_FORM = { name: '', type: 'train', status: 'active' };
 
@@ -12,6 +12,7 @@ export default function AdminOperatorsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
 
   async function loadOperators() {
@@ -29,30 +30,59 @@ export default function AdminOperatorsPage() {
     loadOperators();
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      await createOperator(form);
+      if (editingId) {
+        await updateOperator(editingId, form);
+      } else {
+        await createOperator(form);
+      }
       await loadOperators();
       setIsModalOpen(false);
+      setEditingId(null);
       setForm(DEFAULT_FORM);
     } catch (err: any) {
-      alert('Error adding operator: ' + err.message);
+      alert('Error saving operator: ' + err.message);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+    try {
+      await deleteOperator(id);
+      await loadOperators();
+    } catch (err: any) {
+      alert('Error deleting operator: ' + err.message);
+    }
+  };
+
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(DEFAULT_FORM);
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (op: any) => {
+    setEditingId(op.id);
+    setForm({ name: op.name, type: op.type, status: op.status });
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6 relative">
 
-      {/* Create Operator Modal */}
+      {/* Operator Modal (Create or Edit) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold text-primary mb-4">Add New Operator</h2>
-            <form onSubmit={handleCreate} className="space-y-4">
+            <h2 className="text-xl font-bold text-primary mb-4">
+              {editingId ? 'Edit Operator' : 'Add New Operator'}
+            </h2>
+            <form onSubmit={handleSave} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-primary mb-1">
                   Operator Name
@@ -80,10 +110,23 @@ export default function AdminOperatorsPage() {
                   <option value="both">Both</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Status
+                </label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  className="w-full border border-border rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-primary cursor-pointer"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => { setIsModalOpen(false); setForm(DEFAULT_FORM); }}
+                  onClick={() => { setIsModalOpen(false); setEditingId(null); setForm(DEFAULT_FORM); }}
                   className="px-4 py-2 text-secondary hover:text-primary text-sm cursor-pointer"
                 >
                   Cancel
@@ -93,7 +136,7 @@ export default function AdminOperatorsPage() {
                   disabled={isSaving}
                   className="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-opacity-90 transition-opacity disabled:opacity-60 cursor-pointer"
                 >
-                  {isSaving ? 'Saving...' : 'Save Operator'}
+                  {isSaving ? 'Saving...' : editingId ? 'Update Operator' : 'Save Operator'}
                 </button>
               </div>
             </form>
@@ -108,7 +151,7 @@ export default function AdminOperatorsPage() {
           <p className="text-secondary mt-1">Manage transportation providers.</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openAdd}
           className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded text-sm font-medium hover:bg-opacity-90 transition-opacity cursor-pointer"
         >
           <Plus className="w-4 h-4" />
@@ -159,7 +202,7 @@ export default function AdminOperatorsPage() {
                 title="No operators have been added yet."
                 description="Add your first transportation provider to begin building the inventory."
                 actionLabel="Add Operator"
-                onAction={() => setIsModalOpen(true)}
+                onAction={openAdd}
               />
             </div>
           ) : (
@@ -179,15 +222,28 @@ export default function AdminOperatorsPage() {
                     <td className="px-6 py-4 text-primary font-medium">{op.name}</td>
                     <td className="px-6 py-4 text-secondary capitalize">{op.type}</td>
                     <td className="px-6 py-4">
-                      <span className="bg-success/10 text-success px-2 py-1 rounded text-xs font-medium capitalize">
+                      <span className={`px-2 py-1 rounded text-xs font-medium capitalize ${
+                        op.status === 'active' ? 'bg-success/10 text-success' : 'bg-gray-100 text-secondary'
+                      }`}>
                         {op.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-secondary">
-                      {new Date(op.created_at).toLocaleDateString()}
+                      {op.created_at ? new Date(op.created_at).toLocaleDateString() : '—'}
                     </td>
-                    <td className="px-6 py-4 text-right text-accent font-medium cursor-pointer hover:underline">
-                      Edit
+                    <td className="px-6 py-4 text-right space-x-3 text-sm font-medium">
+                      <button
+                        onClick={() => openEdit(op)}
+                        className="text-primary hover:text-accent cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(op.id, op.name)}
+                        className="text-red-600 hover:text-red-800 cursor-pointer"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}

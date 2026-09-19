@@ -32,6 +32,24 @@ export async function createOperator(data: any) {
   return true;
 }
 
+export async function updateOperator(id: string, data: any) {
+  const supabase = createClient();
+  const payload: any = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.type !== undefined) payload.type = data.type === 'both' ? 'train' : data.type;
+  if (data.status !== undefined) payload.active = data.status !== 'inactive';
+  const { error } = await supabase.from('operators').update(payload).eq('id', id);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function deleteOperator(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from('operators').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
 // --- STATIONS ---
 export async function getStations() {
   const supabase = createClient();
@@ -60,6 +78,25 @@ export async function createStation(data: any) {
     active: data.status !== 'inactive',
   };
   const { error } = await supabase.from('stations').insert([payload]);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function updateStation(id: string, data: any) {
+  const supabase = createClient();
+  const payload: any = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.code !== undefined) payload.code = (data.code || '').trim().toUpperCase();
+  if (data.city !== undefined) payload.city = data.city;
+  if (data.status !== undefined) payload.active = data.status !== 'inactive';
+  const { error } = await supabase.from('stations').update(payload).eq('id', id);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function deleteStation(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from('stations').delete().eq('id', id);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -97,6 +134,23 @@ export async function createRoute(data: any) {
   return true;
 }
 
+export async function updateRoute(id: string, data: any) {
+  const supabase = createClient();
+  const payload: any = {};
+  if (data.origin_station_id) payload.origin_station_id = data.origin_station_id;
+  if (data.destination_station_id) payload.destination_station_id = data.destination_station_id;
+  const { error } = await supabase.from('routes').update(payload).eq('id', id);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function deleteRoute(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from('routes').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
 // --- TRAIN SERVICES ---
 export async function getTrainServices() {
   const supabase = createClient();
@@ -124,6 +178,24 @@ export async function createTrainService(data: any) {
     active: true,
   };
   const { error } = await supabase.from('train_services').insert([payload]);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function updateTrainService(id: string, data: any) {
+  const supabase = createClient();
+  const payload: any = {};
+  if (data.name || data.train_name) payload.train_name = data.name || data.train_name;
+  if (data.train_number) payload.train_number = data.train_number;
+  if (data.operator_id) payload.operator_id = data.operator_id;
+  const { error } = await supabase.from('train_services').update(payload).eq('id', id);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function deleteTrainService(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from('train_services').delete().eq('id', id);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -157,6 +229,24 @@ export async function createBusService(data: any) {
     active: true,
   };
   const { error } = await supabase.from('bus_services').insert([payload]);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function updateBusService(id: string, data: any) {
+  const supabase = createClient();
+  const payload: any = {};
+  if (data.name || data.service_name) payload.service_name = data.name || data.service_name;
+  if (data.bus_type || data.vehicle_type) payload.vehicle_type = data.bus_type || data.vehicle_type;
+  if (data.operator_id) payload.operator_id = data.operator_id;
+  const { error } = await supabase.from('bus_services').update(payload).eq('id', id);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function deleteBusService(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from('bus_services').delete().eq('id', id);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -203,6 +293,23 @@ export async function createSchedule(data: any) {
     payload.bus_service_id = data.service_id;
   }
   const { error } = await supabase.from('schedules').insert([payload]);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function updateSchedule(id: string, data: any) {
+  const supabase = createClient();
+  const payload: any = {};
+  if (data.travel_date) payload.travel_date = data.travel_date;
+  if (data.status) payload.status = data.status;
+  const { error } = await supabase.from('schedules').update(payload).eq('id', id);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function deleteSchedule(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from('schedules').delete().eq('id', id);
   if (error) throw new Error(error.message);
   return true;
 }

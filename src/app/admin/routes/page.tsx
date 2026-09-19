@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { GitBranch, Plus, Search, X } from 'lucide-react';
-import { getRoutes, createRoute, getStations } from '@/services/supabaseAdminService';
+import { getRoutes, createRoute, updateRoute, deleteRoute, getStations } from '@/services/supabaseAdminService';
 import AdminEmptyState from '@/components/admin/AdminEmptyState';
 
 // ---------------------------------------------------------------------------
@@ -59,6 +59,7 @@ function TableSkeleton() {
 // ---------------------------------------------------------------------------
 
 function formatDuration(totalMinutes: number): string {
+  if (!totalMinutes) return '—';
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   return `${h}h ${m}m`;
@@ -85,6 +86,7 @@ export default function AdminRoutesPage() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
 
   // Unified form state
@@ -119,8 +121,22 @@ export default function AdminRoutesPage() {
   // Modal helpers
   // ---------------------------------------------------------------------------
 
-  function openModal() {
+  function openAddModal() {
+    setEditingId(null);
     setForm(EMPTY_FORM);
+    setFormError('');
+    setIsModalOpen(true);
+  }
+
+  function openEditModal(route: Route) {
+    setEditingId(route.id);
+    setForm({
+      name: route.name || '',
+      origin_station_id: route.origin_station_id || '',
+      destination_station_id: route.destination_station_id || '',
+      distance_km: String(route.distance_km || ''),
+      estimated_duration_minutes: String(route.estimated_duration_minutes || ''),
+    });
     setFormError('');
     setIsModalOpen(true);
   }
@@ -128,20 +144,18 @@ export default function AdminRoutesPage() {
   function closeModal() {
     if (isSaving) return;
     setIsModalOpen(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
   }
 
   // ---------------------------------------------------------------------------
-  // Create handler
+  // Save & Delete handlers
   // ---------------------------------------------------------------------------
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
 
-    if (!form.name.trim()) {
-      setFormError('Route name is required.');
-      return;
-    }
     if (!form.origin_station_id) {
       setFormError('Please select an origin station.');
       return;
@@ -154,30 +168,39 @@ export default function AdminRoutesPage() {
       setFormError('Origin and destination must be different.');
       return;
     }
-    if (!form.distance_km || parseFloat(form.distance_km) <= 0) {
-      setFormError('Please enter a valid distance.');
-      return;
-    }
-    if (!form.estimated_duration_minutes || parseInt(form.estimated_duration_minutes) <= 0) {
-      setFormError('Please enter a valid duration.');
-      return;
-    }
 
     setIsSaving(true);
     try {
-      await createRoute({
+      const payload = {
         name: form.name.trim(),
         origin_station_id: form.origin_station_id,
         destination_station_id: form.destination_station_id,
-        distance_km: parseFloat(form.distance_km),
-        estimated_duration_minutes: parseInt(form.estimated_duration_minutes),
-      });
+        distance_km: form.distance_km ? parseFloat(form.distance_km) : 0,
+        estimated_duration_minutes: form.estimated_duration_minutes ? parseInt(form.estimated_duration_minutes) : 0,
+      };
+
+      if (editingId) {
+        await updateRoute(editingId, payload);
+      } else {
+        await createRoute(payload);
+      }
       setIsModalOpen(false);
+      setEditingId(null);
       await fetchData();
     } catch (err: any) {
-      setFormError(err?.message ?? 'Failed to create route. Please try again.');
+      setFormError(err?.message ?? 'Failed to save route. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Are you sure you want to delete route "${name}"?`)) return;
+    try {
+      await deleteRoute(id);
+      await fetchData();
+    } catch (err: any) {
+      alert('Error deleting route: ' + (err?.message ?? 'Unknown error'));
     }
   }
 
@@ -188,15 +211,11 @@ export default function AdminRoutesPage() {
   const filtered = routes.filter((r) => {
     const q = search.toLowerCase();
     return (
-      r.name.toLowerCase().includes(q) ||
+      (r.name || '').toLowerCase().includes(q) ||
       (r.origin_station?.name ?? '').toLowerCase().includes(q) ||
       (r.destination_station?.name ?? '').toLowerCase().includes(q)
     );
   });
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6">
@@ -210,7 +229,7 @@ export default function AdminRoutesPage() {
           </p>
         </div>
         <button
-          onClick={openModal}
+          onClick={openAddModal}
           className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded text-sm font-medium hover:bg-opacity-90 cursor-pointer transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -245,12 +264,12 @@ export default function AdminRoutesPage() {
               title="No routes have been configured."
               description="Define routes by connecting an origin and destination station."
               actionLabel="Add Route"
-              onAction={openModal}
+              onAction={openAddModal}
             />
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm whitespace-nowrap">
               <thead>
                 <tr className="border-b border-border bg-gray-50 text-left text-secondary">
                   <th className="px-6 py-3 font-medium">Route Name</th>
@@ -271,13 +290,24 @@ export default function AdminRoutesPage() {
                     <td className="px-6 py-4 text-secondary">
                       {route.destination_station?.name ?? '-'}
                     </td>
-                    <td className="px-6 py-4 text-secondary">{route.distance_km} km</td>
+                    <td className="px-6 py-4 text-secondary">
+                      {route.distance_km ? `${route.distance_km} km` : '—'}
+                    </td>
                     <td className="px-6 py-4 text-secondary">
                       {formatDuration(route.estimated_duration_minutes)}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-primary text-sm font-medium hover:underline cursor-pointer">
+                    <td className="px-6 py-4 text-right space-x-3 text-sm font-medium">
+                      <button
+                        onClick={() => openEditModal(route)}
+                        className="text-primary hover:text-accent cursor-pointer"
+                      >
                         Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(route.id, route.name)}
+                        className="text-red-600 hover:text-red-800 cursor-pointer"
+                      >
+                        Delete
                       </button>
                     </td>
                   </tr>
@@ -288,14 +318,16 @@ export default function AdminRoutesPage() {
         )}
       </div>
 
-      {/* Create Route Modal */}
+      {/* Create / Edit Route Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
 
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-primary">Add New Route</h2>
+              <h2 className="text-lg font-semibold text-primary">
+                {editingId ? 'Edit Route' : 'Add New Route'}
+              </h2>
               <button
                 onClick={closeModal}
                 className="text-secondary hover:text-primary cursor-pointer transition-colors"
@@ -305,12 +337,12 @@ export default function AdminRoutesPage() {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleCreate} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
 
               {/* Route Name */}
               <div>
                 <label className="block text-sm font-medium text-primary mb-1">
-                  Route Name <span className="text-red-500">*</span>
+                  Route Name (Optional)
                 </label>
                 <input
                   type="text"
@@ -359,16 +391,14 @@ export default function AdminRoutesPage() {
               </div>
 
               {/* Distance & Duration */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1">
-                    Distance (km) <span className="text-red-500">*</span>
+                    Distance (km)
                   </label>
                   <input
                     type="number"
                     name="distance_km"
-                    min="0"
-                    step="0.1"
                     value={form.distance_km}
                     onChange={handleFormChange}
                     placeholder="e.g. 1450"
@@ -377,49 +407,44 @@ export default function AdminRoutesPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1">
-                    Duration (minutes) <span className="text-red-500">*</span>
+                    Duration (minutes)
                   </label>
                   <input
                     type="number"
                     name="estimated_duration_minutes"
-                    min="0"
                     value={form.estimated_duration_minutes}
                     onChange={handleFormChange}
-                    placeholder="e.g. 1320"
+                    placeholder="e.g. 1020"
                     className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
 
-              {/* Error */}
               {formError && (
-                <p className="text-red-500 text-sm">{formError}</p>
+                <p className="text-red-500 text-xs">{formError}</p>
               )}
 
-              {/* Footer Actions */}
-              <div className="flex justify-end gap-3 pt-2">
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
                 <button
                   type="button"
                   onClick={closeModal}
-                  disabled={isSaving}
-                  className="px-4 py-2 text-sm rounded border border-border text-secondary hover:bg-gray-50 cursor-pointer transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-secondary border border-border rounded hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-4 py-2 text-sm rounded bg-primary text-white font-medium hover:bg-opacity-90 cursor-pointer transition-colors disabled:opacity-60"
+                  className="px-4 py-2 text-sm font-medium bg-primary text-white rounded hover:bg-opacity-90 cursor-pointer disabled:opacity-60 transition-opacity"
                 >
-                  {isSaving ? 'Creating...' : 'Create Route'}
+                  {isSaving ? 'Saving...' : editingId ? 'Update Route' : 'Add Route'}
                 </button>
               </div>
-
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }
