@@ -1,14 +1,9 @@
-"use client";
+'use client';
 
 import React, { useEffect, useState } from 'react';
-import AdminEmptyState from '@/components/admin/AdminEmptyState';
 import { Calendar, Plus, Search, X, Train, Bus, Clock, IndianRupee } from 'lucide-react';
-import {
-  getSchedules,
-  createSchedule,
-  getTrainServices,
-  getBusServices,
-} from '@/services/supabaseAdminService';
+import { getSchedules, createSchedule, getTrainServices, getBusServices } from '@/services/supabaseAdminService';
+import AdminEmptyState from '@/components/admin/AdminEmptyState';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -16,7 +11,6 @@ import {
 
 function formatTime(timeStr: string | null | undefined): string {
   if (!timeStr) return '—';
-  // timeStr may be "HH:MM:SS" or "HH:MM"
   const [h, m] = timeStr.split(':');
   const hour = parseInt(h, 10);
   const minute = m ?? '00';
@@ -31,7 +25,7 @@ function formatDate(dateStr: string | null | undefined): string {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function statusBadge(status: string) {
+function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     active: 'bg-green-100 text-green-700',
     cancelled: 'bg-red-100 text-red-700',
@@ -47,249 +41,48 @@ function statusBadge(status: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Modal
+// Initial form state
 // ---------------------------------------------------------------------------
 
-interface ModalProps {
-  trainServices: any[];
-  busServices: any[];
-  onClose: () => void;
-  onCreated: () => void;
-}
-
-function AddScheduleModal({ trainServices, busServices, onClose, onCreated }: ModalProps) {
-  const [serviceType, setServiceType] = useState<'train' | 'bus'>('train');
-  const [trainServiceId, setTrainServiceId] = useState('');
-  const [busServiceId, setBusServiceId] = useState('');
-  const [travelDate, setTravelDate] = useState('');
-  const [departureTime, setDepartureTime] = useState('');
-  const [arrivalTime, setArrivalTime] = useState('');
-  const [availableSeats, setAvailableSeats] = useState('');
-  const [baseFare, setBaseFare] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-
-    const serviceId = serviceType === 'train' ? trainServiceId : busServiceId;
-    if (!serviceId) {
-      setError(`Please select a ${serviceType} service.`);
-      return;
-    }
-    if (!travelDate || !departureTime || !arrivalTime) {
-      setError('Please fill in all date and time fields.');
-      return;
-    }
-    if (!availableSeats || !baseFare) {
-      setError('Please enter available seats and base fare.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await createSchedule({
-        service_type: serviceType,
-        service_id: serviceId,
-        travel_date: travelDate,
-        departure_time: departureTime,
-        arrival_time: arrivalTime,
-        available_seats: parseInt(availableSeats, 10),
-        base_fare: parseFloat(baseFare),
-        status: 'active',
-      });
-      onCreated();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to create schedule. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  const inputCls =
-    'w-full border border-border rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-primary placeholder-gray-400';
-  const labelCls = 'block text-xs font-medium text-secondary mb-1';
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <div className="flex items-center space-x-2">
-            <Calendar className="w-5 h-5 text-primary" />
-            <h2 className="text-base font-semibold text-primary">Add Schedule</h2>
-          </div>
-          <button onClick={onClose} className="cursor-pointer text-secondary hover:text-primary transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {/* Service Type */}
-          <div>
-            <p className={labelCls}>Service Type</p>
-            <div className="flex space-x-4">
-              {(['train', 'bus'] as const).map((type) => (
-                <label key={type} className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="serviceType"
-                    value={type}
-                    checked={serviceType === type}
-                    onChange={() => setServiceType(type)}
-                    className="accent-primary cursor-pointer"
-                  />
-                  <span className="flex items-center space-x-1 text-sm text-primary capitalize">
-                    {type === 'train' ? <Train className="w-4 h-4" /> : <Bus className="w-4 h-4" />}
-                    <span>{type === 'train' ? 'Train' : 'Bus'}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Dynamic service dropdown */}
-          {serviceType === 'train' ? (
-            <div>
-              <label className={labelCls}>Train Service</label>
-              <select
-                value={trainServiceId}
-                onChange={(e) => setTrainServiceId(e.target.value)}
-                className={`${inputCls} cursor-pointer`}
-              >
-                <option value="">Select a train service</option>
-                {trainServices.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.train_number ? `${s.train_number} — ` : ''}{s.train_name ?? s.name ?? s.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label className={labelCls}>Bus Service</label>
-              <select
-                value={busServiceId}
-                onChange={(e) => setBusServiceId(e.target.value)}
-                className={`${inputCls} cursor-pointer`}
-              >
-                <option value="">Select a bus service</option>
-                {busServices.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.bus_number ? `${s.bus_number} — ` : ''}{s.bus_name ?? s.name ?? s.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Travel Date */}
-          <div>
-            <label className={labelCls}>Travel Date</label>
-            <input
-              type="date"
-              value={travelDate}
-              onChange={(e) => setTravelDate(e.target.value)}
-              className={inputCls}
-            />
-          </div>
-
-          {/* Departure / Arrival */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Departure Time</label>
-              <input
-                type="time"
-                value={departureTime}
-                onChange={(e) => setDepartureTime(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Arrival Time</label>
-              <input
-                type="time"
-                value={arrivalTime}
-                onChange={(e) => setArrivalTime(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          {/* Seats / Fare */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Available Seats</label>
-              <input
-                type="number"
-                min="1"
-                placeholder="e.g. 120"
-                value={availableSeats}
-                onChange={(e) => setAvailableSeats(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Base Fare (INR)</label>
-              <div className="relative">
-                <IndianRupee className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-secondary" />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="e.g. 499.00"
-                  value={baseFare}
-                  onChange={(e) => setBaseFare(e.target.value)}
-                  className={`${inputCls} pl-8`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-end space-x-3 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer px-4 py-2 text-sm font-medium text-secondary border border-border rounded hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="cursor-pointer px-5 py-2 text-sm font-medium text-white bg-primary rounded hover:bg-opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Creating...' : 'Create Schedule'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+const INITIAL_FORM = {
+  service_type: 'train' as 'train' | 'bus',
+  service_id: '',
+  travel_date: '',
+  departure_time: '',
+  arrival_time: '',
+  available_seats: '',
+  base_fare: '',
+};
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default function AdminSchedulesPage() {
+  // Data state
   const [schedules, setSchedules] = useState<any[]>([]);
   const [trainServices, setTrainServices] = useState<any[]>([]);
   const [busServices, setBusServices] = useState<any[]>([]);
+
+  // UI state
   const [isLoading, setIsLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Form state
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [formError, setFormError] = useState('');
+
+  // Filter state
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // -------------------------------------------------------------------------
+  // Data fetching
+  // -------------------------------------------------------------------------
+
   async function loadAll() {
+    setIsLoading(true);
     try {
       const [sched, trains, buses] = await Promise.all([
         getSchedules(),
@@ -310,12 +103,64 @@ export default function AdminSchedulesPage() {
     loadAll();
   }, []);
 
-  function handleCreated() {
-    setShowModal(false);
-    loadAll();
+  // -------------------------------------------------------------------------
+  // Create handler
+  // -------------------------------------------------------------------------
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError('');
+
+    if (!form.service_id) {
+      setFormError(`Please select a ${form.service_type} service.`);
+      return;
+    }
+    if (!form.travel_date || !form.departure_time || !form.arrival_time) {
+      setFormError('Please fill in all date and time fields.');
+      return;
+    }
+    if (!form.available_seats || !form.base_fare) {
+      setFormError('Please enter available seats and base fare.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await createSchedule({
+        service_type: form.service_type,
+        service_id: form.service_id,
+        travel_date: form.travel_date,
+        departure_time: form.departure_time,
+        arrival_time: form.arrival_time,
+        available_seats: parseInt(form.available_seats, 10),
+        base_fare: parseFloat(form.base_fare),
+        status: 'active',
+      });
+      setIsModalOpen(false);
+      setForm(INITIAL_FORM);
+      await loadAll();
+    } catch (err: any) {
+      setFormError(err?.message ?? 'Failed to create schedule. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
+  function openModal() {
+    setForm(INITIAL_FORM);
+    setFormError('');
+    setIsModalOpen(true);
+  }
+
+  function closeModal() {
+    setIsModalOpen(false);
+    setFormError('');
+  }
+
+  // -------------------------------------------------------------------------
   // Client-side filtering
+  // -------------------------------------------------------------------------
+
   const filtered = schedules.filter((s) => {
     const matchStatus = statusFilter === 'all' || s.status?.toLowerCase() === statusFilter;
     const q = search.toLowerCase();
@@ -328,19 +173,205 @@ export default function AdminSchedulesPage() {
     return matchStatus && matchSearch;
   });
 
+  // -------------------------------------------------------------------------
+  // Shared input / label styles
+  // -------------------------------------------------------------------------
+
+  const inputCls =
+    'w-full border border-border rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-primary placeholder-gray-400';
+  const labelCls = 'block text-xs font-medium text-secondary mb-1';
+
+  // Dynamic service list based on selected type
+  const serviceOptions = form.service_type === 'train' ? trainServices : busServices;
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
+
   return (
     <>
-      {showModal && (
-        <AddScheduleModal
-          trainServices={trainServices}
-          busServices={busServices}
-          onClose={() => setShowModal(false)}
-          onCreated={handleCreated}
-        />
+      {/* ------------------------------------------------------------------ */}
+      {/* Modal                                                                */}
+      {/* ------------------------------------------------------------------ */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                <h2 className="text-base font-semibold text-primary">Add Schedule</h2>
+              </div>
+              <button
+                onClick={closeModal}
+                className="cursor-pointer text-secondary hover:text-primary transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal form */}
+            <form onSubmit={handleCreate} className="px-6 py-5 space-y-4">
+              {/* Service Type */}
+              <div>
+                <p className={labelCls}>Service Type</p>
+                <div className="flex space-x-6">
+                  {(['train', 'bus'] as const).map((type) => (
+                    <label key={type} className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="serviceType"
+                        value={type}
+                        checked={form.service_type === type}
+                        onChange={() =>
+                          setForm((prev) => ({ ...prev, service_type: type, service_id: '' }))
+                        }
+                        className="accent-primary cursor-pointer"
+                      />
+                      <span className="flex items-center space-x-1.5 text-sm text-primary">
+                        {type === 'train' ? (
+                          <Train className="w-4 h-4" />
+                        ) : (
+                          <Bus className="w-4 h-4" />
+                        )}
+                        <span className="capitalize">{type}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dynamic Service dropdown */}
+              <div>
+                <label className={labelCls}>
+                  {form.service_type === 'train' ? 'Train Service' : 'Bus Service'}
+                </label>
+                <select
+                  value={form.service_id}
+                  onChange={(e) => setForm((prev) => ({ ...prev, service_id: e.target.value }))}
+                  className={`${inputCls} cursor-pointer`}
+                >
+                  <option value="">
+                    Select a {form.service_type} service
+                  </option>
+                  {serviceOptions.map((s: any) => {
+                    const label =
+                      form.service_type === 'train'
+                        ? `${s.train_number ? s.train_number + ' — ' : ''}${s.train_name ?? s.name ?? s.id}`
+                        : `${s.bus_number ? s.bus_number + ' — ' : ''}${s.bus_name ?? s.name ?? s.id}`;
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Travel Date */}
+              <div>
+                <label className={labelCls}>Travel Date</label>
+                <input
+                  type="date"
+                  value={form.travel_date}
+                  onChange={(e) => setForm((prev) => ({ ...prev, travel_date: e.target.value }))}
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Departure / Arrival Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Departure Time</label>
+                  <input
+                    type="time"
+                    value={form.departure_time}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, departure_time: e.target.value }))
+                    }
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Arrival Time</label>
+                  <input
+                    type="time"
+                    value={form.arrival_time}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, arrival_time: e.target.value }))
+                    }
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              {/* Available Seats / Base Fare */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Available Seats</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 120"
+                    value={form.available_seats}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, available_seats: e.target.value }))
+                    }
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Base Fare (INR)</label>
+                  <div className="relative">
+                    <IndianRupee className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-secondary" />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 499.00"
+                      value={form.base_fare}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, base_fare: e.target.value }))
+                      }
+                      className={`${inputCls} pl-8`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Error message */}
+              {formError && (
+                <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-3 py-2">
+                  {formError}
+                </p>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center justify-end space-x-3 pt-1">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="cursor-pointer px-4 py-2 text-sm font-medium text-secondary border border-border rounded hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="cursor-pointer px-5 py-2 text-sm font-medium text-white bg-primary rounded hover:bg-opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? 'Creating...' : 'Create Schedule'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Page body                                                            */}
+      {/* ------------------------------------------------------------------ */}
       <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6">
-
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -348,7 +379,7 @@ export default function AdminSchedulesPage() {
             <p className="text-secondary mt-1">Manage departure and arrival timetables.</p>
           </div>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={openModal}
             className="cursor-pointer flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded text-sm font-medium hover:bg-opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
@@ -358,7 +389,6 @@ export default function AdminSchedulesPage() {
 
         {/* Card */}
         <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
-
           {/* Toolbar */}
           <div className="p-4 border-b border-border bg-gray-50 flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[180px] max-w-sm">
@@ -372,12 +402,6 @@ export default function AdminSchedulesPage() {
                 className="w-full border border-border rounded pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
-            <input
-              type="date"
-              disabled={isLoading || schedules.length === 0}
-              onChange={(e) => setSearch(e.target.value)}
-              className="border border-border rounded px-3 py-2 text-sm bg-white text-secondary cursor-pointer hidden md:block disabled:opacity-50"
-            />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -392,19 +416,19 @@ export default function AdminSchedulesPage() {
             </select>
           </div>
 
-          {/* Content */}
+          {/* Content area */}
           <div className="overflow-x-auto min-h-[400px] flex flex-col">
             {isLoading ? (
               /* Loading skeleton */
               <div className="flex-1 p-6 space-y-3">
-                {[...Array(5)].map((_, i) => (
+                {[...Array(6)].map((_, i) => (
                   <div key={i} className="animate-pulse flex items-center space-x-4">
                     <div className="h-4 bg-gray-200 rounded w-24" />
-                    <div className="h-4 bg-gray-200 rounded w-32" />
+                    <div className="h-4 bg-gray-200 rounded w-16" />
                     <div className="h-4 bg-gray-200 rounded w-20" />
                     <div className="h-4 bg-gray-200 rounded w-20" />
-                    <div className="h-4 bg-gray-200 rounded w-16" />
-                    <div className="h-4 bg-gray-200 rounded w-16" />
+                    <div className="h-4 bg-gray-200 rounded w-12" />
+                    <div className="h-4 bg-gray-200 rounded w-20" />
                     <div className="h-5 bg-gray-200 rounded-full w-14" />
                     <div className="h-4 bg-gray-200 rounded w-12 ml-auto" />
                   </div>
@@ -416,9 +440,9 @@ export default function AdminSchedulesPage() {
                 <AdminEmptyState
                   icon={Calendar}
                   title="No schedules have been created."
-                  description="Add schedules to make services bookable."
+                  description="Add schedules to make services bookable by passengers."
                   actionLabel="Add Schedule"
-                  onAction={() => setShowModal(true)}
+                  onAction={openModal}
                 />
               </div>
             ) : filtered.length === 0 ? (
@@ -432,11 +456,11 @@ export default function AdminSchedulesPage() {
                 <thead className="bg-gray-50 border-b border-border text-secondary">
                   <tr>
                     <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Date</th>
-                    <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Service</th>
+                    <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Type</th>
                     <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Departure</th>
                     <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Arrival</th>
                     <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Seats</th>
-                    <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Fare</th>
+                    <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Fare (INR)</th>
                     <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Status</th>
                     <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs text-right">Actions</th>
                   </tr>
@@ -449,9 +473,9 @@ export default function AdminSchedulesPage() {
                         {formatDate(schedule.travel_date)}
                       </td>
 
-                      {/* Service */}
+                      {/* Type */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1.5">
                           {schedule.service_type === 'train' ? (
                             <Train className="w-4 h-4 text-secondary flex-shrink-0" />
                           ) : (
@@ -466,7 +490,7 @@ export default function AdminSchedulesPage() {
                       {/* Departure */}
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-1.5 text-primary">
-                          <Clock className="w-3.5 h-3.5 text-secondary" />
+                          <Clock className="w-3.5 h-3.5 text-secondary flex-shrink-0" />
                           <span>{formatTime(schedule.departure_time)}</span>
                         </div>
                       </td>
@@ -474,7 +498,7 @@ export default function AdminSchedulesPage() {
                       {/* Arrival */}
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-1.5 text-primary">
-                          <Clock className="w-3.5 h-3.5 text-secondary" />
+                          <Clock className="w-3.5 h-3.5 text-secondary flex-shrink-0" />
                           <span>{formatTime(schedule.arrival_time)}</span>
                         </div>
                       </td>
@@ -487,13 +511,16 @@ export default function AdminSchedulesPage() {
                       {/* Fare */}
                       <td className="px-6 py-4 text-primary">
                         {schedule.base_fare != null
-                          ? `₹${Number(schedule.base_fare).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          ? `₹${Number(schedule.base_fare).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`
                           : '—'}
                       </td>
 
                       {/* Status */}
                       <td className="px-6 py-4">
-                        {statusBadge(schedule.status)}
+                        <StatusBadge status={schedule.status} />
                       </td>
 
                       {/* Actions */}
@@ -512,7 +539,8 @@ export default function AdminSchedulesPage() {
           {/* Footer count */}
           {!isLoading && schedules.length > 0 && (
             <div className="px-6 py-3 border-t border-border bg-gray-50 text-xs text-secondary">
-              Showing {filtered.length} of {schedules.length} schedule{schedules.length !== 1 ? 's' : ''}
+              Showing {filtered.length} of {schedules.length} schedule
+              {schedules.length !== 1 ? 's' : ''}
             </div>
           )}
         </div>

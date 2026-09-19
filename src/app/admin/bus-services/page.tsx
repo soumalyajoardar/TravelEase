@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
 import React, { useEffect, useState } from 'react';
-import AdminEmptyState from '@/components/admin/AdminEmptyState';
 import { Bus, Plus, Search, X, Loader2 } from 'lucide-react';
+import AdminEmptyState from '@/components/admin/AdminEmptyState';
 import {
   getBusServices,
   createBusService,
@@ -10,17 +10,53 @@ import {
   getRoutes,
 } from '@/services/supabaseAdminService';
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 const BUS_TYPES = ['Sleeper', 'Semi-Sleeper', 'Seater', 'AC Sleeper'] as const;
 
 const SKELETON_ROWS = 5;
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface FormState {
+  name: string;
+  bus_number: string;
+  operator_id: string;
+  route_id: string;
+  bus_type: string;
+  total_seats: string;
+  status: string;
+}
+
+const EMPTY_FORM: FormState = {
+  name: '',
+  bus_number: '',
+  operator_id: '',
+  route_id: '',
+  bus_type: 'Sleeper',
+  total_seats: '',
+  status: 'active',
+};
+
+// ---------------------------------------------------------------------------
+// TableSkeleton
+// ---------------------------------------------------------------------------
+
 function TableSkeleton() {
+  const cols = ['Service Name', 'Bus No.', 'Operator Name', 'Type', 'Status', 'Actions'];
   return (
     <table className="w-full text-left text-sm whitespace-nowrap">
       <thead className="bg-gray-50 border-b border-border text-secondary">
         <tr>
-          {['Service Name', 'Bus No.', 'Operator', 'Type', 'Status', 'Actions'].map((col) => (
-            <th key={col} className="px-6 py-3 font-medium uppercase tracking-wider text-xs">
+          {cols.map((col) => (
+            <th
+              key={col}
+              className="px-6 py-3 font-medium uppercase tracking-wider text-xs"
+            >
               {col}
             </th>
           ))}
@@ -42,36 +78,48 @@ function TableSkeleton() {
   );
 }
 
-interface FormState {
-  name: string;
-  bus_number: string;
-  operator_id: string;
-  route_id: string;
-  bus_type: string;
-  total_seats: string;
+// ---------------------------------------------------------------------------
+// StatusBadge
+// ---------------------------------------------------------------------------
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === 'active') {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        Active
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+      {status ?? 'Unknown'}
+    </span>
+  );
 }
 
-const EMPTY_FORM: FormState = {
-  name: '',
-  bus_number: '',
-  operator_id: '',
-  route_id: '',
-  bus_type: '',
-  total_seats: '',
-};
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function AdminBusServicesPage() {
+  // Data
   const [services, setServices] = useState<any[]>([]);
   const [operators, setOperators] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
+
+  // UI state
   const [isLoading, setIsLoading] = useState(true);
-
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [submitting, setSubmitting] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
-
   const [search, setSearch] = useState('');
+
+  // Form
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+
+  // -------------------------------------------------------------------------
+  // Data fetching
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     async function load() {
@@ -85,7 +133,7 @@ export default function AdminBusServicesPage() {
         setOperators(opData);
         setRoutes(rtData);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to load bus services data:', err);
       } finally {
         setIsLoading(false);
       }
@@ -93,36 +141,61 @@ export default function AdminBusServicesPage() {
     load();
   }, []);
 
+  // -------------------------------------------------------------------------
+  // Modal helpers
+  // -------------------------------------------------------------------------
+
   function openModal() {
     setForm(EMPTY_FORM);
     setFormError('');
-    setShowModal(true);
+    setIsModalOpen(true);
   }
 
   function closeModal() {
-    if (submitting) return;
-    setShowModal(false);
+    if (isSaving) return;
+    setIsModalOpen(false);
   }
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  // -------------------------------------------------------------------------
+  // Create
+  // -------------------------------------------------------------------------
+
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
 
-    if (!form.name.trim()) { setFormError('Service name is required.'); return; }
-    if (!form.bus_number.trim()) { setFormError('Bus number is required.'); return; }
-    if (!form.operator_id) { setFormError('Please select an operator.'); return; }
-    if (!form.route_id) { setFormError('Please select a route.'); return; }
-    if (!form.bus_type) { setFormError('Please select a bus type.'); return; }
+    if (!form.name.trim()) {
+      setFormError('Service name is required.');
+      return;
+    }
+    if (!form.bus_number.trim()) {
+      setFormError('Bus number is required.');
+      return;
+    }
+    if (!form.operator_id) {
+      setFormError('Please select an operator.');
+      return;
+    }
+    if (!form.route_id) {
+      setFormError('Please select a route.');
+      return;
+    }
+    if (!form.bus_type) {
+      setFormError('Please select a bus type.');
+      return;
+    }
     if (!form.total_seats || parseInt(form.total_seats) <= 0) {
       setFormError('Total seats must be a positive number.');
       return;
     }
 
-    setSubmitting(true);
+    setIsSaving(true);
     try {
       await createBusService({
         name: form.name.trim(),
@@ -131,36 +204,31 @@ export default function AdminBusServicesPage() {
         route_id: form.route_id,
         bus_type: form.bus_type,
         total_seats: parseInt(form.total_seats),
-        status: 'active',
+        status: form.status,
       });
       const updated = await getBusServices();
       setServices(updated);
-      setShowModal(false);
+      setIsModalOpen(false);
     } catch (err: any) {
-      setFormError(err?.message || 'Failed to create bus service. Please try again.');
+      setFormError(
+        err?.message || 'Failed to create bus service. Please try again.'
+      );
     } finally {
-      setSubmitting(false);
+      setIsSaving(false);
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Derived
+  // -------------------------------------------------------------------------
 
   const filtered = services.filter((s) =>
     s.name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  function getStatusBadge(status: string) {
-    if (status === 'active') {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          Active
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-        {status ?? 'Unknown'}
-      </span>
-    );
-  }
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6">
@@ -169,7 +237,9 @@ export default function AdminBusServicesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-primary">Bus Services</h1>
-          <p className="text-secondary mt-1 text-sm">Manage bus inventory and vehicle types.</p>
+          <p className="text-secondary mt-1 text-sm">
+            Manage bus inventory and vehicle types.
+          </p>
         </div>
         <button
           onClick={openModal}
@@ -216,29 +286,57 @@ export default function AdminBusServicesPage() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-gray-50 border-b border-border text-secondary">
                 <tr>
-                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Service Name</th>
-                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Bus No.</th>
-                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Operator</th>
-                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Type</th>
-                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">Status</th>
-                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs text-right">Actions</th>
+                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">
+                    Service Name
+                  </th>
+                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">
+                    Bus No.
+                  </th>
+                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">
+                    Operator Name
+                  </th>
+                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 font-medium uppercase tracking-wider text-xs text-right">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-secondary text-sm">
+                    <td
+                      colSpan={6}
+                      className="px-6 py-12 text-center text-secondary text-sm"
+                    >
                       No results found for &quot;{search}&quot;.
                     </td>
                   </tr>
                 ) : (
                   filtered.map((service) => (
-                    <tr key={service.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-primary">{service.name}</td>
-                      <td className="px-6 py-4 text-secondary font-mono">{service.bus_number}</td>
-                      <td className="px-6 py-4 text-secondary">{service.operator?.name ?? '—'}</td>
-                      <td className="px-6 py-4 text-secondary">{service.bus_type ?? '—'}</td>
-                      <td className="px-6 py-4">{getStatusBadge(service.status)}</td>
+                    <tr
+                      key={service.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 font-medium text-primary">
+                        {service.name}
+                      </td>
+                      <td className="px-6 py-4 text-secondary font-mono">
+                        {service.bus_number}
+                      </td>
+                      <td className="px-6 py-4 text-secondary">
+                        {service.operator?.name ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 text-secondary">
+                        {service.bus_type ?? '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={service.status} />
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <button className="text-sm text-primary font-medium hover:underline cursor-pointer">
                           View
@@ -254,7 +352,7 @@ export default function AdminBusServicesPage() {
       </div>
 
       {/* Modal */}
-      {showModal && (
+      {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
@@ -275,7 +373,7 @@ export default function AdminBusServicesPage() {
               </div>
               <button
                 onClick={closeModal}
-                disabled={submitting}
+                disabled={isSaving}
                 className="text-secondary hover:text-primary transition-colors cursor-pointer disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
@@ -283,7 +381,7 @@ export default function AdminBusServicesPage() {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleCreate} className="px-6 py-5 space-y-4">
 
               {formError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded">
@@ -301,7 +399,7 @@ export default function AdminBusServicesPage() {
                   name="name"
                   value={form.name}
                   onChange={handleChange}
-                  placeholder="e.g. Volvo AC Sleeper"
+                  placeholder="e.g. Volvo AC Sleeper Express"
                   className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-primary"
                 />
               </div>
@@ -356,7 +454,7 @@ export default function AdminBusServicesPage() {
                   {routes.map((rt) => (
                     <option key={rt.id} value={rt.id}>
                       {rt.origin_station?.name ?? rt.origin_station_id}
-                      {' → '}
+                      {' \u2192 '}
                       {rt.destination_station?.name ?? rt.destination_station_id}
                     </option>
                   ))}
@@ -404,17 +502,17 @@ export default function AdminBusServicesPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  disabled={submitting}
+                  disabled={isSaving}
                   className="px-4 py-2 text-sm font-medium text-secondary border border-border rounded hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={isSaving}
                   className="flex items-center space-x-2 px-4 py-2 text-sm font-medium bg-primary text-white rounded hover:bg-opacity-90 transition-opacity cursor-pointer disabled:opacity-70"
                 >
-                  {submitting ? (
+                  {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>Creating...</span>

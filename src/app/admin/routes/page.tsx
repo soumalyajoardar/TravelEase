@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import AdminEmptyState from '@/components/admin/AdminEmptyState';
 import { GitBranch, Plus, Search, X } from 'lucide-react';
 import { getRoutes, createRoute, getStations } from '@/services/supabaseAdminService';
+import AdminEmptyState from '@/components/admin/AdminEmptyState';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +23,14 @@ interface Route {
   estimated_duration_minutes: number;
   origin_station?: { name: string } | null;
   destination_station?: { name: string } | null;
+}
+
+interface RouteForm {
+  name: string;
+  origin_station_id: string;
+  destination_station_id: string;
+  distance_km: string;
+  estimated_duration_minutes: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +64,14 @@ function formatDuration(totalMinutes: number): string {
   return `${h}h ${m}m`;
 }
 
+const EMPTY_FORM: RouteForm = {
+  name: '',
+  origin_station_id: '',
+  destination_station_id: '',
+  distance_km: '',
+  estimated_duration_minutes: '',
+};
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -63,31 +79,27 @@ function formatDuration(totalMinutes: number): string {
 export default function AdminRoutesPage() {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Form fields
-  const [name, setName] = useState('');
-  const [originId, setOriginId] = useState('');
-  const [destinationId, setDestinationId] = useState('');
-  const [distance, setDistance] = useState('');
-  const [duration, setDuration] = useState('');
+  // Unified form state
+  const [form, setForm] = useState<RouteForm>(EMPTY_FORM);
 
   // ---------------------------------------------------------------------------
   // Data fetching
   // ---------------------------------------------------------------------------
 
   async function fetchData() {
-    setLoading(true);
+    setIsLoading(true);
     const [routesData, stationsData] = await Promise.all([getRoutes(), getStations()]);
     setRoutes(routesData as Route[]);
     setStations(stationsData as Station[]);
-    setLoading(false);
+    setIsLoading(false);
   }
 
   useEffect(() => {
@@ -95,50 +107,77 @@ export default function AdminRoutesPage() {
   }, []);
 
   // ---------------------------------------------------------------------------
+  // Form helpers
+  // ---------------------------------------------------------------------------
+
+  function handleFormChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  // ---------------------------------------------------------------------------
   // Modal helpers
   // ---------------------------------------------------------------------------
 
   function openModal() {
-    setName('');
-    setOriginId('');
-    setDestinationId('');
-    setDistance('');
-    setDuration('');
+    setForm(EMPTY_FORM);
     setFormError('');
     setIsModalOpen(true);
   }
 
   function closeModal() {
-    if (submitting) return;
+    if (isSaving) return;
     setIsModalOpen(false);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  // ---------------------------------------------------------------------------
+  // Create handler
+  // ---------------------------------------------------------------------------
+
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
 
-    if (!name.trim()) { setFormError('Route name is required.'); return; }
-    if (!originId) { setFormError('Please select an origin station.'); return; }
-    if (!destinationId) { setFormError('Please select a destination station.'); return; }
-    if (originId === destinationId) { setFormError('Origin and destination must be different.'); return; }
-    if (!distance || parseFloat(distance) <= 0) { setFormError('Please enter a valid distance.'); return; }
-    if (!duration || parseInt(duration) <= 0) { setFormError('Please enter a valid duration.'); return; }
+    if (!form.name.trim()) {
+      setFormError('Route name is required.');
+      return;
+    }
+    if (!form.origin_station_id) {
+      setFormError('Please select an origin station.');
+      return;
+    }
+    if (!form.destination_station_id) {
+      setFormError('Please select a destination station.');
+      return;
+    }
+    if (form.origin_station_id === form.destination_station_id) {
+      setFormError('Origin and destination must be different.');
+      return;
+    }
+    if (!form.distance_km || parseFloat(form.distance_km) <= 0) {
+      setFormError('Please enter a valid distance.');
+      return;
+    }
+    if (!form.estimated_duration_minutes || parseInt(form.estimated_duration_minutes) <= 0) {
+      setFormError('Please enter a valid duration.');
+      return;
+    }
 
-    setSubmitting(true);
+    setIsSaving(true);
     try {
       await createRoute({
-        name: name.trim(),
-        origin_station_id: originId,
-        destination_station_id: destinationId,
-        distance_km: parseFloat(distance),
-        estimated_duration_minutes: parseInt(duration),
+        name: form.name.trim(),
+        origin_station_id: form.origin_station_id,
+        destination_station_id: form.destination_station_id,
+        distance_km: parseFloat(form.distance_km),
+        estimated_duration_minutes: parseInt(form.estimated_duration_minutes),
       });
       setIsModalOpen(false);
       await fetchData();
     } catch (err: any) {
       setFormError(err?.message ?? 'Failed to create route. Please try again.');
     } finally {
-      setSubmitting(false);
+      setIsSaving(false);
     }
   }
 
@@ -166,7 +205,9 @@ export default function AdminRoutesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-primary">Routes</h1>
-          <p className="text-secondary mt-1 text-sm">Manage travel routes connecting stations across the network.</p>
+          <p className="text-secondary mt-1 text-sm">
+            Manage travel routes connecting stations across the network.
+          </p>
         </div>
         <button
           onClick={openModal}
@@ -195,7 +236,7 @@ export default function AdminRoutesPage() {
         </div>
 
         {/* Content */}
-        {loading ? (
+        {isLoading ? (
           <TableSkeleton />
         ) : filtered.length === 0 ? (
           <div className="p-8 flex items-center justify-center min-h-[400px]">
@@ -224,10 +265,16 @@ export default function AdminRoutesPage() {
                 {filtered.map((route) => (
                   <tr key={route.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-primary">{route.name}</td>
-                    <td className="px-6 py-4 text-secondary">{route.origin_station?.name ?? '-'}</td>
-                    <td className="px-6 py-4 text-secondary">{route.destination_station?.name ?? '-'}</td>
+                    <td className="px-6 py-4 text-secondary">
+                      {route.origin_station?.name ?? '-'}
+                    </td>
+                    <td className="px-6 py-4 text-secondary">
+                      {route.destination_station?.name ?? '-'}
+                    </td>
                     <td className="px-6 py-4 text-secondary">{route.distance_km} km</td>
-                    <td className="px-6 py-4 text-secondary">{formatDuration(route.estimated_duration_minutes)}</td>
+                    <td className="px-6 py-4 text-secondary">
+                      {formatDuration(route.estimated_duration_minutes)}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-primary text-sm font-medium hover:underline cursor-pointer">
                         Edit
@@ -249,13 +296,16 @@ export default function AdminRoutesPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h2 className="text-lg font-semibold text-primary">Add New Route</h2>
-              <button onClick={closeModal} className="text-secondary hover:text-primary cursor-pointer transition-colors">
+              <button
+                onClick={closeModal}
+                className="text-secondary hover:text-primary cursor-pointer transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleCreate} className="px-6 py-5 space-y-4">
 
               {/* Route Name */}
               <div>
@@ -264,8 +314,9 @@ export default function AdminRoutesPage() {
                 </label>
                 <input
                   type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  name="name"
+                  value={form.name}
+                  onChange={handleFormChange}
                   placeholder="e.g. Kolkata to Delhi Express"
                   className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-primary"
                 />
@@ -277,8 +328,9 @@ export default function AdminRoutesPage() {
                   Origin Station <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={originId}
-                  onChange={(e) => setOriginId(e.target.value)}
+                  name="origin_station_id"
+                  value={form.origin_station_id}
+                  onChange={handleFormChange}
                   className="w-full border border-border rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="">Select origin station</option>
@@ -294,8 +346,9 @@ export default function AdminRoutesPage() {
                   Destination Station <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={destinationId}
-                  onChange={(e) => setDestinationId(e.target.value)}
+                  name="destination_station_id"
+                  value={form.destination_station_id}
+                  onChange={handleFormChange}
                   className="w-full border border-border rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="">Select destination station</option>
@@ -313,10 +366,11 @@ export default function AdminRoutesPage() {
                   </label>
                   <input
                     type="number"
+                    name="distance_km"
                     min="0"
                     step="0.1"
-                    value={distance}
-                    onChange={(e) => setDistance(e.target.value)}
+                    value={form.distance_km}
+                    onChange={handleFormChange}
                     placeholder="e.g. 1450"
                     className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-primary"
                   />
@@ -327,9 +381,10 @@ export default function AdminRoutesPage() {
                   </label>
                   <input
                     type="number"
+                    name="estimated_duration_minutes"
                     min="0"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
+                    value={form.estimated_duration_minutes}
+                    onChange={handleFormChange}
                     placeholder="e.g. 1320"
                     className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-primary"
                   />
@@ -346,17 +401,17 @@ export default function AdminRoutesPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  disabled={submitting}
+                  disabled={isSaving}
                   className="px-4 py-2 text-sm rounded border border-border text-secondary hover:bg-gray-50 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={isSaving}
                   className="px-4 py-2 text-sm rounded bg-primary text-white font-medium hover:bg-opacity-90 cursor-pointer transition-colors disabled:opacity-60"
                 >
-                  {submitting ? 'Creating...' : 'Create Route'}
+                  {isSaving ? 'Creating...' : 'Create Route'}
                 </button>
               </div>
 
