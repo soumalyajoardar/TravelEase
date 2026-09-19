@@ -28,21 +28,21 @@ export default function Hero({ cmsData }: HeroProps) {
           aria-hidden="true"
         />
         {/* Overlay to ensure text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0B1F33]/80 via-[#0B1F33]/40 to-transparent lg:bg-gradient-to-r lg:from-[#0B1F33]/90 lg:via-[#0B1F33]/60 lg:to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0B1F33]/90 via-[#0B1F33]/50 to-[#0B1F33]/20 lg:bg-gradient-to-r lg:from-[#0B1F33]/95 lg:via-[#0B1F33]/70 lg:to-transparent" />
         
         {/* Hero Content */}
         <div className="relative max-w-[1440px] mx-auto px-4 md:px-8 min-h-[650px] flex flex-col justify-start lg:justify-center pt-12 lg:pt-0">
-          <div className="max-w-xl text-white mb-8 lg:mb-16">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight whitespace-pre-wrap">
+          <div className="max-w-xl text-white mb-8 lg:mb-16 animate-fade-in-up">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight whitespace-pre-wrap drop-shadow-md">
               {title}
             </h1>
-            <p className="text-lg md:text-xl text-white/90 leading-relaxed max-w-lg whitespace-pre-wrap">
+            <p className="text-lg md:text-xl text-white/90 leading-relaxed max-w-lg whitespace-pre-wrap drop-shadow">
               {subtitle}
             </p>
           </div>
           
           {/* Desktop Search Card positioning: overlapping or inside hero */}
-          <div className="w-full lg:w-auto">
+          <div className="w-full lg:w-auto animate-fade-in-up" style={{ animationDelay: '200ms' }}>
             <SearchCard />
           </div>
         </div>

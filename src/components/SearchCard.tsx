@@ -96,20 +96,20 @@ export default function SearchCard() {
         {/* Dates */}
         <div className="flex flex-row gap-3 flex-1 min-w-0">
           <div className="flex-1 flex flex-col min-w-0">
-            <label htmlFor="departure" className="text-sm font-semibold text-primary mb-1.5">Departure</label>
+            <label htmlFor="departure" className="text-sm font-semibold text-primary mb-1.5 cursor-pointer">Departure</label>
             <input 
               id="departure"
               type="date" 
               defaultValue="2026-09-20"
-              className="border border-border rounded px-2 md:px-3 py-2.5 text-sm md:text-base text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow bg-white w-full"
+              className="border border-border rounded px-2 md:px-3 py-2.5 text-sm md:text-base text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow bg-white w-full cursor-pointer hover:border-gray-400"
             />
           </div>
           <div className="flex-1 flex flex-col min-w-0">
-            <label htmlFor="return" className="text-sm font-semibold text-primary mb-1.5 whitespace-nowrap">Return <span className="hidden xl:inline">(Optional)</span></label>
+            <label htmlFor="return" className="text-sm font-semibold text-primary mb-1.5 whitespace-nowrap cursor-pointer">Return <span className="hidden xl:inline">(Optional)</span></label>
             <input 
               id="return"
               type="date"
-              className="border border-border rounded px-2 md:px-3 py-2.5 text-sm md:text-base text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow bg-white w-full"
+              className="border border-border rounded px-2 md:px-3 py-2.5 text-sm md:text-base text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow bg-white w-full cursor-pointer hover:border-gray-400"
             />
           </div>
         </div>
@@ -117,10 +117,10 @@ export default function SearchCard() {
         {/* Travellers & Search Button */}
         <div className="flex flex-row lg:flex-row gap-3 lg:shrink-0">
           <div className="flex flex-col flex-1 sm:w-32 lg:w-32 shrink-0">
-            <label htmlFor="travellers" className="text-sm font-semibold text-primary mb-1.5">Travellers</label>
+            <label htmlFor="travellers" className="text-sm font-semibold text-primary mb-1.5 cursor-pointer">Travellers</label>
             <select 
               id="travellers"
-              className="border border-border rounded px-3 py-2.5 text-base text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow bg-white appearance-none w-full"
+              className="border border-border rounded px-3 py-2.5 text-base text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow bg-white appearance-none w-full cursor-pointer hover:border-gray-400"
             >
               <option value="1">1 Adult</option>
               <option value="2">2 Adults</option>
@@ -137,7 +137,7 @@ export default function SearchCard() {
                 const travellers = (document.getElementById('travellers') as HTMLSelectElement)?.value || '1';
                 window.location.href = `/search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&date=${encodeURIComponent(date)}&travellers=${encodeURIComponent(travellers)}&type=${activeTab}`;
               }}
-              className="bg-accent hover:bg-[#e09b00] text-primary font-bold text-lg px-2 md:px-4 py-2.5 h-[46px] rounded transition-colors w-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
+              className="bg-gradient-to-r from-accent to-[#e09b00] hover:from-[#e09b00] hover:to-[#cc8a00] text-primary font-bold text-lg px-2 md:px-4 py-2.5 h-[46px] rounded shadow-sm hover:shadow-md transition-all transform hover:-translate-y-0.5 w-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent cursor-pointer"
             >
               Search
             </button>
