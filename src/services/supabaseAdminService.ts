@@ -1,17 +1,33 @@
 // Admin service — runs in the browser using the anon key.
-// Admin-level access is enforced by Supabase RLS policies that check the user's role.
+// Matches normalized database schema from Supabase.
 import { createClient } from '@/utils/supabase/client';
 
 // --- OPERATORS ---
 export async function getOperators() {
   const supabase = createClient();
-  const { data, error } = await supabase.from('operators').select('*').order('created_at', { ascending: false });
-  if (error) { console.error('getOperators:', error.message); return []; }
-  return data || [];
+  const { data, error } = await supabase
+    .from('operators')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getOperators error:', error.message);
+    return [];
+  }
+  return (data || []).map(op => ({
+    ...op,
+    status: op.status || (op.active ? 'active' : 'inactive'),
+  }));
 }
+
 export async function createOperator(data: any) {
   const supabase = createClient();
-  const { error } = await supabase.from('operators').insert([data]);
+  const payload = {
+    name: data.name,
+    type: data.type === 'both' ? 'train' : data.type,
+    active: data.status !== 'inactive',
+  };
+  const { error } = await supabase.from('operators').insert([payload]);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -19,13 +35,31 @@ export async function createOperator(data: any) {
 // --- STATIONS ---
 export async function getStations() {
   const supabase = createClient();
-  const { data, error } = await supabase.from('stations').select('*').order('name', { ascending: true });
-  if (error) { console.error('getStations:', error.message); return []; }
-  return data || [];
+  const { data, error } = await supabase
+    .from('stations')
+    .select('*')
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error('getStations error:', error.message);
+    return [];
+  }
+  return (data || []).map(st => ({
+    ...st,
+    status: st.status || (st.active ? 'active' : 'inactive'),
+    type: st.type || 'train',
+  }));
 }
+
 export async function createStation(data: any) {
   const supabase = createClient();
-  const { error } = await supabase.from('stations').insert([data]);
+  const payload = {
+    name: data.name,
+    code: (data.code || '').trim().toUpperCase(),
+    city: data.city,
+    active: data.status !== 'inactive',
+  };
+  const { error } = await supabase.from('stations').insert([payload]);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -35,13 +69,30 @@ export async function getRoutes() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('routes')
-    .select('*, origin_station:origin_station_id(name), destination_station:destination_station_id(name)');
-  if (error) { console.error('getRoutes:', error.message); return []; }
-  return data || [];
+    .select('*, origin_station:origin_station_id(name, city), destination_station:destination_station_id(name, city)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getRoutes error:', error.message);
+    return [];
+  }
+  return (data || []).map(r => ({
+    ...r,
+    name: r.name || `${r.origin_station?.name || 'Origin'} → ${r.destination_station?.name || 'Destination'}`,
+    status: r.status || (r.active ? 'active' : 'inactive'),
+    distance_km: r.distance_km || 0,
+    estimated_duration_minutes: r.estimated_duration_minutes || 0,
+  }));
 }
+
 export async function createRoute(data: any) {
   const supabase = createClient();
-  const { error } = await supabase.from('routes').insert([data]);
+  const payload = {
+    origin_station_id: data.origin_station_id,
+    destination_station_id: data.destination_station_id,
+    active: true,
+  };
+  const { error } = await supabase.from('routes').insert([payload]);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -51,13 +102,28 @@ export async function getTrainServices() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('train_services')
-    .select('*, operator:operator_id(name), route:route_id(origin_station_id, destination_station_id)');
-  if (error) { console.error('getTrainServices:', error.message); return []; }
-  return data || [];
+    .select('*, operator:operator_id(name)');
+
+  if (error) {
+    console.error('getTrainServices error:', error.message);
+    return [];
+  }
+  return (data || []).map(t => ({
+    ...t,
+    name: t.train_name,
+    status: t.status || (t.active ? 'active' : 'inactive'),
+  }));
 }
+
 export async function createTrainService(data: any) {
   const supabase = createClient();
-  const { error } = await supabase.from('train_services').insert([data]);
+  const payload = {
+    operator_id: data.operator_id || null,
+    train_number: data.train_number,
+    train_name: data.name || data.train_name,
+    active: true,
+  };
+  const { error } = await supabase.from('train_services').insert([payload]);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -67,13 +133,30 @@ export async function getBusServices() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('bus_services')
-    .select('*, operator:operator_id(name), route:route_id(origin_station_id, destination_station_id)');
-  if (error) { console.error('getBusServices:', error.message); return []; }
-  return data || [];
+    .select('*, operator:operator_id(name)');
+
+  if (error) {
+    console.error('getBusServices error:', error.message);
+    return [];
+  }
+  return (data || []).map(b => ({
+    ...b,
+    name: b.service_name,
+    bus_number: b.bus_number || b.id.slice(0, 6).toUpperCase(),
+    bus_type: b.vehicle_type,
+    status: b.status || (b.active ? 'active' : 'inactive'),
+  }));
 }
+
 export async function createBusService(data: any) {
   const supabase = createClient();
-  const { error } = await supabase.from('bus_services').insert([data]);
+  const payload = {
+    operator_id: data.operator_id || null,
+    service_name: data.name || data.service_name,
+    vehicle_type: data.bus_type || data.vehicle_type || 'AC Sleeper',
+    active: true,
+  };
+  const { error } = await supabase.from('bus_services').insert([payload]);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -81,13 +164,45 @@ export async function createBusService(data: any) {
 // --- SCHEDULES ---
 export async function getSchedules() {
   const supabase = createClient();
-  const { data, error } = await supabase.from('schedules').select('*').order('travel_date', { ascending: false });
-  if (error) { console.error('getSchedules:', error.message); return []; }
-  return data || [];
+  const { data, error } = await supabase
+    .from('schedules')
+    .select('*, train:train_service_id(train_name, train_number), bus:bus_service_id(service_name)')
+    .order('travel_date', { ascending: false });
+
+  if (error) {
+    console.error('getSchedules error:', error.message);
+    return [];
+  }
+  return (data || []).map(s => ({
+    ...s,
+    service_id: s.service_type === 'train' ? s.train?.train_name : s.bus?.service_name,
+    departure_time: s.departure_at ? new Date(s.departure_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '10:00 AM',
+    arrival_time: s.arrival_at ? new Date(s.arrival_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '06:00 PM',
+    available_seats: s.available_seats || 50,
+    base_fare: s.base_fare || 450,
+    status: s.status || 'active',
+  }));
 }
+
 export async function createSchedule(data: any) {
   const supabase = createClient();
-  const { error } = await supabase.from('schedules').insert([data]);
+  const travelDate = data.travel_date || new Date().toISOString().split('T')[0];
+  const departureAt = `${travelDate}T${data.departure_time || '10:00'}:00Z`;
+  const arrivalAt = `${travelDate}T${data.arrival_time || '18:00'}:00Z`;
+  const payload: any = {
+    service_type: data.service_type,
+    travel_date: travelDate,
+    departure_at: departureAt,
+    arrival_at: arrivalAt,
+    status: 'scheduled',
+    active: true,
+  };
+  if (data.service_type === 'train') {
+    payload.train_service_id = data.service_id;
+  } else {
+    payload.bus_service_id = data.service_id;
+  }
+  const { error } = await supabase.from('schedules').insert([payload]);
   if (error) throw new Error(error.message);
   return true;
 }
@@ -100,11 +215,18 @@ export async function getAdminBookings() {
     .select('*, user:user_id(full_name, email)')
     .order('created_at', { ascending: false });
   if (error) { console.error('getAdminBookings:', error.message); return []; }
-  return data || [];
+  return (data || []).map(b => ({
+    ...b,
+    status: b.booking_status || b.status || 'pending',
+  }));
 }
+
 export async function cancelAdminBooking(bookingId: string) {
   const supabase = createClient();
-  const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
+  const { error } = await supabase
+    .from('bookings')
+    .update({ booking_status: 'cancelled', status: 'cancelled' })
+    .eq('id', bookingId);
   if (error) throw new Error(error.message);
   return true;
 }
