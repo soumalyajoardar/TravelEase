@@ -20,25 +20,92 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// In a real app, this would be a secure HttpOnly cookie session validated by the backend.
-// For the mockup, we simulate standard Auth flows using local state and localStorage.
+import { createClient } from '@/utils/supabase/client';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const supabase = createClient();
 
   useEffect(() => {
-    // Initial load: check for session
-    const storedUser = localStorage.getItem('te_mock_session');
-    if (storedUser) {
+    let mounted = true;
+
+    async function loadSession() {
       try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        localStorage.removeItem('te_mock_session');
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          await fetchProfile(session.user);
+        } else {
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading session:", error);
+        if (mounted) {
+          setUser(null);
+          setIsLoading(false);
+        }
       }
     }
-    setIsLoading(false);
+
+    async function fetchProfile(authUser: any) {
+      if (!mounted) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+
+        if (error || !data) {
+          // If profile doesn't exist yet (e.g. just signed up and trigger hasn't fired), 
+          // create a fallback user object
+          setUser({
+            id: authUser.id,
+            name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+            email: authUser.email || '',
+            role: 'customer'
+          });
+        } else {
+          setUser({
+            id: data.id,
+            name: data.full_name,
+            email: data.email,
+            role: data.role as 'customer' | 'admin'
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    }
+
+    loadSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          await fetchProfile(session.user);
+        } else {
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
+          }
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Protected route checking
@@ -54,45 +121,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isLoading, user, pathname, router]);
 
   const login = async (email: string, password: string) => {
-    // Simulate network delay and backend validation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Strict Mock Backend Validation Rule: We only mock the flow, no hardcoded "fake users" in UI, 
-    // but we need to let the user in for testing the prototype. 
-    // If they type 'admin@travelease.com', give admin role, otherwise standard customer.
-    if (password.length < 6) {
-      throw new Error("Your email or password is incorrect.");
-    }
-    
-    const loggedInUser: User = {
-      id: 'USR' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-      name: email.split('@')[0], // Derive simple name from email for mock
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
-      role: email === 'admin@travelease.com' ? 'admin' : 'customer'
-    };
+      password,
+    });
     
-    setUser(loggedInUser);
-    localStorage.setItem('te_mock_session', JSON.stringify(loggedInUser));
+    if (error) {
+      throw new Error(error.message);
+    }
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    // Simulate network delay and backend validation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const newUser: User = {
-      id: 'USR' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-      name,
+    const { data, error } = await supabase.auth.signUp({
       email,
-      role: 'customer'
-    };
+      password,
+      options: {
+        data: {
+          full_name: name,
+        }
+      }
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
     
-    setUser(newUser);
-    localStorage.setItem('te_mock_session', JSON.stringify(newUser));
+    // We insert into profiles directly from client side to ensure it exists immediately if RLS allows it
+    // Wait, typically this is done via DB trigger. But just in case:
+    if (data.user) {
+      // Best effort insert. If it fails due to RLS, the trigger hopefully caught it.
+      await supabase.from('profiles').insert({
+        id: data.user.id,
+        full_name: name,
+        email: email,
+        role: 'customer'
+      }).select().single();
+    }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('te_mock_session');
     router.push('/login');
   };
 
