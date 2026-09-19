@@ -1,5 +1,4 @@
-'use server';
-import { createAdminClient } from '@/utils/supabase/server';
+import { createClient } from '@/utils/supabase/client';
 
 export interface CustomerProfile {
   id: string;
@@ -21,7 +20,7 @@ export interface CustomerDetail extends CustomerProfile {
 // --- ADMIN FACING ---
 
 export async function getAdminCustomers(): Promise<CustomerProfile[]> {
-  const supabase = await createAdminClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name, email, role, created_at')
@@ -42,7 +41,7 @@ export async function getAdminCustomers(): Promise<CustomerProfile[]> {
 }
 
 export async function getAdminCustomerById(userId: string): Promise<CustomerDetail | null> {
-  const supabase = await createAdminClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name, email, role, created_at')
@@ -65,7 +64,7 @@ export async function getAdminCustomerById(userId: string): Promise<CustomerDeta
 }
 
 export async function setCustomerStatus(userId: string, status: 'active' | 'deactivated'): Promise<boolean> {
-  const supabase = await createAdminClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from('profiles')
     .update({ status })
