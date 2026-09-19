@@ -19,7 +19,7 @@ export default function Logo({ variant = 'long', theme = 'light', className = ''
           alt="TravelEase Logo Icon" 
           width={42} 
           height={32} 
-          className={`object-contain mix-blend-multiply ${isDark ? 'brightness-0 invert mix-blend-screen' : ''}`}
+          className="object-contain rounded"
         />
       </Link>
     );
@@ -28,11 +28,11 @@ export default function Logo({ variant = 'long', theme = 'light', className = ''
   return (
     <Link href="/" className={`flex items-center hover:opacity-90 transition-opacity ${className}`} aria-label="TravelEase Home">
       <Image 
-        src="/images/brand-logo-long-v2.jpg" 
+        src={isDark ? "/images/brand-logo-dark.png" : "/images/brand-logo-light.png"} 
         alt="TravelEase Logo" 
         width={180} 
         height={32} 
-        className={`object-contain mix-blend-multiply ${isDark ? 'brightness-0 invert mix-blend-screen' : ''}`}
+        className="object-contain"
         priority
       />
     </Link>
