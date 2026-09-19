@@ -38,20 +38,31 @@ export async function createClient() {
   };
 }
 
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
 /**
  * Creates an admin client using the Service Role Key.
  * Bypasses RLS. STRICTLY FOR SERVER-SIDE ADMIN USAGE ONLY.
  * NEVER EXPOSE TO BROWSER.
  */
 export async function createAdminClient() {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('SUPABASE_SERVICE_ROLE_KEY is missing. Mock admin mode active.');
+    return {
+      from: (table: string) => ({
+        select: () => ({ data: [], error: null })
+      })
+    } as any;
   }
   
-  return {
-    // Mock admin client structure
-    from: (table: string) => ({
-      select: () => ({ data: [], error: null })
-    })
-  };
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
 }

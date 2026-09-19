@@ -1,36 +1,41 @@
+"use server";
+
 import { createAdminClient } from '@/utils/supabase/server';
-
-// This file represents the secure server-side data access layer for the Admin Panel.
-// It uses the Supabase Admin Client (Service Role Key) to bypass RLS for administrative tasks.
-// For the purpose of this environment where Supabase is not yet connected, 
-// we will simulate the backend responses with empty arrays to represent the genuine empty database state.
-
-// In a real deployment, this would query the Supabase PostgreSQL database.
 
 // --- OPERATORS ---
 export async function getOperators() {
   const supabase = await createAdminClient();
-  // const { data, error } = await supabase.from('operators').select('*').order('created_at', { ascending: false });
-  // if (error) throw error;
-  return []; // Returning real empty state
+  const { data, error } = await supabase.from('operators').select('*').order('created_at', { ascending: false });
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data || [];
 }
 
 export async function createOperator(data: any) {
   const supabase = await createAdminClient();
-  // const { error } = await supabase.from('operators').insert([data]);
-  // if (error) throw error;
-  throw new Error("Supabase connection required to persist real data.");
+  const { error } = await supabase.from('operators').insert([data]);
+  if (error) throw error;
+  return true;
 }
 
 // --- STATIONS ---
 export async function getStations() {
   const supabase = await createAdminClient();
-  return [];
+  const { data, error } = await supabase.from('stations').select('*').order('name', { ascending: true });
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data || [];
 }
 
 export async function createStation(data: any) {
   const supabase = await createAdminClient();
-  throw new Error("Supabase connection required to persist real data.");
+  const { error } = await supabase.from('stations').insert([data]);
+  if (error) throw error;
+  return true;
 }
 
 // --- ROUTES ---

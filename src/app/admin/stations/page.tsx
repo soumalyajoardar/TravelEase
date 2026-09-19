@@ -31,7 +31,26 @@ export default function AdminStationsPage() {
           <h1 className="text-2xl font-bold text-primary">Stations</h1>
           <p className="text-secondary mt-1">Manage physical travel locations and stops.</p>
         </div>
-        <button className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded text-sm font-medium hover:bg-opacity-90 transition-opacity">
+        <button 
+          onClick={() => {
+            const name = prompt("Enter Station Name (e.g. New Delhi Railway Station):");
+            if (!name) return;
+            const code = prompt("Enter Station Code (e.g. NDLS):");
+            if (!code) return;
+            const city = prompt("Enter City:");
+            if (!city) return;
+            
+            import('@/services/supabaseAdminService').then(async (service) => {
+              try {
+                await service.createStation({ name, code, city, type: 'train', status: 'active' });
+                alert("Station added!");
+                window.location.reload();
+              } catch (e: any) {
+                alert("Error adding station: " + e.message);
+              }
+            });
+          }}
+          className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded text-sm font-medium hover:bg-opacity-90 transition-opacity">
           <Plus className="w-4 h-4" />
           <span>Add Station</span>
         </button>
@@ -85,6 +104,21 @@ export default function AdminStationsPage() {
                 </tr>
               </thead>
               <tbody>
+                {stations.map((station: any) => (
+                  <tr key={station.id} className="border-b border-border hover:bg-gray-50">
+                    <td className="px-6 py-4 text-primary font-medium">{station.name}</td>
+                    <td className="px-6 py-4 text-secondary">{station.code}</td>
+                    <td className="px-6 py-4 text-secondary">{station.city}</td>
+                    <td className="px-6 py-4">
+                      <span className="bg-success/10 text-success px-2 py-1 rounded text-xs font-medium">
+                        {station.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right text-accent font-medium cursor-pointer">
+                      Edit
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
