@@ -46,7 +46,7 @@ export default function SearchClient({
       try {
         setIsLoading(true);
         setError(false);
-        const data = await searchTravelRecords(initialOrigin, initialDestination, activeTab);
+        const data = await searchTravelRecords(initialOrigin, initialDestination, activeTab, initialDate);
         setRecords(data);
       } catch (err) {
         setError(true);
@@ -56,7 +56,7 @@ export default function SearchClient({
     };
 
     fetchData();
-  }, [initialOrigin, initialDestination, activeTab, hasParams]);
+  }, [initialOrigin, initialDestination, activeTab, initialDate, hasParams]);
 
   const handleCompareToggle = (id: string) => {
     setCompareIds(prev => 
